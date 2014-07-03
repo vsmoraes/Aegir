@@ -1,0 +1,20 @@
+{
+    "name": "vsmoraes/aegir",
+    "description": "Little PHP chat using sockets and websockets",
+    "license": "GPLv3",
+    "authors": [
+        {
+            "name": "Vinicius Moraes",
+            "email": "vinicius@archlinux.com.br"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": ">=5.3.0"
+    },
+    "autoload": {
+        "psr-0": {
+            "VSMoraes\\Aegir": "src/"
+        }
+    }
+}
