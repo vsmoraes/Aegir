@@ -1,6 +1,9 @@
 <?php namespace Vsmoraes\Aegir\Core;
 
-class Server {
+use Vsmoraes\Aegir\Core\MessageHandler;
+use Vsmoraes\Aegir\Core\Client;
+
+class Server extends MessageHandler {
     /**
      * Server host
      * @var string
@@ -30,6 +33,8 @@ class Server {
      * @var array
      */
     protected $changed;
+
+    protected $listeners = [];
 
     /**
      * Open the server socket and authenticate with the Asterisk client
@@ -63,7 +68,7 @@ class Server {
     public function __destruct()
     {
         foreach( $this->clients AS $client ) {
-            socket_close($client);
+            $client->disconnect();
         }
 
         socket_close($this->socket);
@@ -115,30 +120,24 @@ class Server {
         if ( in_array($this->socket, $this->changed) ) {
             $socket_new = socket_accept($this->socket); //accept new socket
 
-            $this->sendWelcome($socket_new);
+            $client_id = $this->generateClientId();
 
-            $this->clients[] = $socket_new; // add the new client to the client's array
+            $this->clients[$client_id] = new Client($socket_new, $this); // add the new client to the client's array
 
             unset($this->changed[0]); // remove the server socket from the changed
 
-            socket_getpeername($socket_new, $ip);
-            $this->debug('Client', 'Client connected from: ' . $ip);
+            $this->debug('Client', 'Client connected from: ' . $this->clients[$client_id]->getIp());
         }
 
         return $this;
     }
 
-    /**
-     * Send a welcome message to the new clients
-     * @param resource $socket client socket
-     *
-     * @return void
-     */
-    protected function sendWelcome($socket)
+    protected  function generateClientId()
     {
-        $msg = "\nAegir simple server.\n\n";
+        $client_count = count($this->clients);
+        $key = preg_replace_callback('/([ ])/', function() { return chr(rand(97,122)); }, '     ');
 
-        $this->sendMessage($socket, $msg);
+        return md5($key . $client_count);
     }
 
     /**
@@ -148,17 +147,22 @@ class Server {
      */
     protected function checkDisconnect()
     {
-        foreach ( $this->changed as $changed_socket ) {
+        foreach ( $this->changed AS $id => $changed_socket ) {
+
             $buf = @socket_read($changed_socket, 1024, PHP_NORMAL_READ);
-            if ( $buf !== false || count($this->clients) < 1 ) { // check disconnected client
+
+            if ( $buf !== false || $id == '_server' || count($this->clients) < 1 ) { // check disconnected client
                 continue;
             }
 
             // remove client for $clients array
-            $found_socket = array_search($changed_socket, $this->clients);
-            unset($this->clients[$found_socket]);
+            //$found_socket = array_search($changed_socket, $this->clients);
+            //unset($this->clients[$found_socket]);
+            $ip = $this->clients[$id]->getIp();
+            $this->clients[$id]->disconnect();
 
-            socket_getpeername($changed_socket, $ip);
+            unset($this->clients[$id]);
+
             $this->debug('Client', 'Client disconnected: ' . $ip);
         }
 
@@ -189,20 +193,16 @@ class Server {
      */
     public function checkMessageRecieved()
     {
-        foreach ($this->changed as $key => $socket) {
+        foreach ( $this->changed AS $key => $socket ) {
             $buffer = null;
-            while ( socket_recv($socket, $buffer, 1024, 0) >= 1 ) {
+            while ( @socket_recv($socket, $buffer, 1024, 0) >= 1 ) {
                 if ( trim($buffer) == '' ) {
                     continue;
                 }
 
                 $buffer = trim($buffer) . PHP_EOL;
-                $this->parseCommand($socket, $buffer);
-                /*
-                $this->sendMessage($socket, '>> Echo: ' . trim($buffer) . PHP_EOL);
-                */
-                socket_getpeername($socket, $ip);
-                $this->debug('Client', 'Message from ' . $ip . ': ' . trim($buffer));
+
+                $this->handleRecievedMessage($this->clients[$key], $buffer);
 
                 unset($this->changed[$key]);
                 break;
@@ -219,7 +219,11 @@ class Server {
     protected function waitForChange()
     {
         // reset changed
-        $this->changed = array_merge([$this->socket], $this->clients);
+        $this->changed = []; //array_merge([$this->socket], $this->clients);
+        $this->changed['_server'] = $this->socket;
+        foreach ( $this->clients AS $id => $client ) {
+            $this->changed[$id] = $client->getSocket();
+        }
 
         // variable call time pass by reference req of socket_select
         $null = null;
@@ -228,21 +232,6 @@ class Server {
         socket_select($this->changed, $null, $null, null);
 
         return $this;
-    }
-    
-    /**
-     * Send a message to the given socket
-     * @param  resource $client client socket
-     * @param  string $msg message
-     * 
-     * @return true
-     */
-    public function sendMessage($client, $msg)
-    {
-        $msg .= "\n\r";
-        socket_write($client, $msg, strlen($msg));
-        
-        return true;
     }
 
     /**
@@ -253,5 +242,45 @@ class Server {
     public function getClients()
     {
         return $this->clients;
+    }
+
+    public function getHost()
+    {
+        return $this->host;
+    }
+
+    public function getPort()
+    {
+        return $this->port;
+    }
+
+    public function handleRecievedMessage($client, $message)
+    {
+        $json = $this->unmask(trim($message));
+        $json = json_decode($json, true);
+        
+        if ( ! is_array($json) ) { // Probably the handshake
+            $client->sendHandshake($message);
+        } else {
+            if ( array_key_exists('event', $json) ) {
+                $this->fireEvent($json['event'], $client, $json);
+            } else {
+                // do nothing...
+            }
+        }
+    }
+
+    protected function fireEvent($event, $client, $params)
+    {
+        if ( array_key_exists($event, $this->listeners) ) {
+            $this->listeners[$event]($event, $params, $client);
+        } elseif ( array_key_exists('*', $this->listeners) ) {
+            $this->listeners['*']($event, $params, $client);
+        }
+    }
+
+    public function on($event, $closure)
+    {
+        $this->listeners[$event] = $closure;
     }
 }

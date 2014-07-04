@@ -1,0 +1,40 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <title>Aegir : Socket client</title>
+
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.0/jquery.min.js"></script>
+
+        <script type="text/javascript">
+            $(document).ready(function(){
+                //create a new WebSocket object.
+                var wsUri = "ws://vsmoraes.dev:10000";
+                websocket = new WebSocket(wsUri); 
+    
+                websocket.onopen = function(ev) { // connection is open 
+                    console.log('@onopen');
+                    console.log(ev);
+                }
+    
+                //#### Message received from server?
+                websocket.onmessage = function(ev) {
+                    console.log('@onmessage');
+                    console.log(ev);
+                };    
+    
+                websocket.onerror = function(ev) { 
+                    console.log('@onerror');
+                    console.log(ev);
+                };
+
+                websocket.onclose = function(ev) { 
+                    console.log('@onclose');
+                    console.log(ev);
+                };
+            });
+        </script>
+    </head>
+
+    <body>
+    </body>
+</html>
