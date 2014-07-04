@@ -1,6 +1,6 @@
 {
     "name": "vsmoraes/aegir",
-    "description": "Little PHP chat using sockets and websockets",
+    "description": "Little PHP chat using sockets and websockets.",
     "license": "GPLv3",
     "authors": [
         {
@@ -8,13 +8,15 @@
             "email": "vinicius@archlinux.com.br"
         }
     ],
-    "minimum-stability": "dev",
     "require": {
-        "php": ">=5.3.0"
+        "php": ">=5.4.0"
+    },
+    "require-dev": {
     },
     "autoload": {
         "psr-0": {
-            "VSMoraes\\Aegir": "src/"
+            "Vsmoraes\\Aegir": "src/",
+            "Vsmoraes\\Testlib": "src/"
         }
     }
 }
