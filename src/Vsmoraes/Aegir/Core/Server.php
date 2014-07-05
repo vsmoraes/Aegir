@@ -123,6 +123,7 @@ class Server extends MessageHandler {
             $client_id = $this->generateClientId();
 
             $this->clients[$client_id] = new Client($socket_new, $this); // add the new client to the client's array
+            $this->clients[$client_id]->setId($client_id);
 
             unset($this->changed[0]); // remove the server socket from the changed
 
@@ -212,7 +213,6 @@ class Server extends MessageHandler {
     
     /**
      * Resets all changed sockets and wait for interactions
-     * @return [type] [description]
      *
      * @return SocketServer this
      */
@@ -252,6 +252,15 @@ class Server extends MessageHandler {
     public function getPort()
     {
         return $this->port;
+    }
+
+    public function getClient($id)
+    {
+        if ( array_key_exists($id, $this->clients) ) {
+            return $this->clients[$id];
+        } else {
+            return null;
+        }
     }
 
     public function handleRecievedMessage($client, $message)

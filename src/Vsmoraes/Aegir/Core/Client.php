@@ -4,7 +4,7 @@ use Vsmoraes\Aegir\Core\MessageHandler;
 
 class Client extends MessageHandler {
     protected $socket;
-    protected $attributes;
+    protected $id;
     private $server_confs = [];
 
     public function __construct($socket, Server $server)
@@ -31,6 +31,16 @@ class Client extends MessageHandler {
     {
         socket_getpeername($this->socket, $ip);
         return $ip;
+    }
+
+    public function setId($id)
+    {
+        $this->id = $id;
+    }
+
+    public function getId()
+    {
+        return $this->id;
     }
 
     /**
