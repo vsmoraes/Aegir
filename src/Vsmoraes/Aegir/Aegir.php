@@ -13,31 +13,75 @@ class Aegir extends Server {
         return $this;
     }
 
+    public function updateUserList()
+    {
+        $clients = $this->getClients();
+
+        $client_name_list = [];
+
+        foreach ( $clients AS $client ) {
+            if ( $client->isAuthenticated() ) {
+                $client_name_list[] = $client->getUsername();
+            }
+        }
+
+        $this->broadcast([
+            'event'     => 'updateUserList',
+            'user_list' => $client_name_list
+        ]);
+    }
+
+    public function broadcast($message)
+    {
+        $clients = $this->getClients();
+
+        foreach ( $clients AS $client ) {
+            if ( $client->isAuthenticated() ) {
+                $client->sendMessage($message);
+            }
+        }
+    }
+
     protected function registerEvents()
     {
+        $this->bindDisconnect();
         $this->bindLogin();
         $this->bindMessageToAll();
         $this->bindDirectMessage();
     }
 
+    private function bindDisconnect()
+    {
+        $this->on('disconnect', function($event, $e, $client) {
+            $this->broadcast([
+                'event' => 'message',
+                'message' => $client->getUsername() . ' has left the room'
+            ]);
+            $this->updateUserList();
+        });
+    }
+
     private function bindLogin()
     {
         $this->on('login', function($event, $e, $client) {
+            $client->setUsername($e['username']);
+
+            $this->broadcast([
+                'event'   => 'message',
+                'message' => $e['username'] . ' has joined the room'
+            ]);
+            $this->updateUserList();
         });
     }
 
     private function bindMessageToAll()
     {
         $this->on('message', function($event, $e, $client) {
-            $client_list = $this->getClients();
-
-            foreach ( $client_list AS $c ) {
-                $msg = [
-                    'event'   => 'message',
-                    'message' => $e['message']
-                ];
-                $c->sendMessage($msg);
-            }
+            $message = $client->getUsername() . ': ' . $e['message'];
+            $this->broadcast([
+                'event'   => 'message',
+                'message' => $message
+            ]);
         });
     }
 

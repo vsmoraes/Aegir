@@ -3,9 +3,28 @@
 use Vsmoraes\Aegir\Core\MessageHandler;
 
 class Client extends MessageHandler {
+    private $server_confs = [];
+
     protected $socket;
     protected $id;
-    private $server_confs = [];
+    protected $auth = false;
+    protected $username = '';
+
+    public function setUsername($username)
+    {
+        $this->username = $username;
+        $this->auth = true;
+    }
+
+    public function getUsername()
+    {
+        return $this->username;
+    }
+
+    public function isAuthenticated()
+    {
+        return $this->auth;
+    }
 
     public function __construct($socket, Server $server)
     {
@@ -24,6 +43,7 @@ class Client extends MessageHandler {
 
     public function disconnect()
     {
+        $this->auth = false;
         socket_close($this->socket);
     }
 
@@ -53,11 +73,13 @@ class Client extends MessageHandler {
      */
     public function sendMessage($msg = array(), $plain = false)
     {
+
         if ( ! $plain ) {
-            $msg = $this->mask(json_encode($msg));
+            $msg = $this->mask(json_encode($msg) . "\r\n");
+        } else {
+            $msg .= "\r\n";
         }
 
-        $msg .= "\r\n";
         socket_write($this->socket, $msg, strlen($msg));
         
         return true;

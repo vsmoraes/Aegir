@@ -161,7 +161,8 @@ class Server extends MessageHandler {
             //unset($this->clients[$found_socket]);
             $ip = $this->clients[$id]->getIp();
             $this->clients[$id]->disconnect();
-
+            $this->fireEvent('disconnect', $this->clients[$id], ['event' => 'disconnect']);
+            
             unset($this->clients[$id]);
 
             $this->debug('Client', 'Client disconnected: ' . $ip);
@@ -201,7 +202,7 @@ class Server extends MessageHandler {
                     continue;
                 }
 
-                $buffer = trim($buffer) . PHP_EOL;
+                $buffer = trim($buffer);
 
                 $this->handleRecievedMessage($this->clients[$key], $buffer);
 
@@ -229,7 +230,7 @@ class Server extends MessageHandler {
         $null = null;
 
         // this next part is blocking so that we dont run away with cpu
-        socket_select($this->changed, $null, $null, null);
+        socket_select($this->changed, $null, $null, 0, 10);
 
         return $this;
     }
@@ -265,7 +266,7 @@ class Server extends MessageHandler {
 
     public function handleRecievedMessage($client, $message)
     {
-        $json = $this->unmask(trim($message));
+        $json = $this->unmask($message);
         $json = json_decode($json, true);
         
         if ( ! is_array($json) ) { // Probably the handshake

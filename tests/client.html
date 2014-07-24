@@ -7,6 +7,27 @@
         <script src="//code.jquery.com/jquery-2.1.1.min.js"></script>
         <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
 
+        <style text="text/css">
+            .starter-template {
+                padding: 40px 15px;
+                text-align: center;
+            }
+
+            .chat {
+                height: 345px;
+                text-align: left;
+                overflow: auto;
+            }
+            .userlist {
+                height: 300px;
+                overflow: auto;
+            }
+            .list-group-item {
+                padding: 5px;
+                text-align: left;
+            }
+        </style>
+
         <script type="text/javascript">
             var Class = function(methods) {   
                 var klass = function() {    
@@ -23,10 +44,14 @@
             };
 
             var Client = Class({ 
+                self: this,
+
                 socket: null,
 
                 host: null,
                 port: null,
+
+                listeners: [],
 
                 initialize: function(host, port) {
                     this.host = host;
@@ -36,46 +61,93 @@
                 connect: function() {
                     this.socket = new WebSocket('ws://' + this.host + ':' + this.port);
                     this.socket.onopen = this.onOpen;
-                    this.socket.onmessage = this.onMessage;
+
+                    this.socket.onmessage = this.onMessage.bind(this);
+                    
                     this.socket.onerror = this.onError;
                     this.socket.onclose = this.onClose;
                 },
 
                 send: function(message) {
-                    console.log('@send');
-
-                    this.socket.send(JSON.stringify({
-                        event: 'message',
-                        message: message
-                    }));
+                    this.socket.send(message);
                 },
 
                 chat: function(message) {
-                    $('#chatlog').append('<p>' + message + '</p>');
+                    var d = $('#chatlog');
+                    var date = new Date();
+
+                    d.append('<p>[' + date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds() + '] ' + message + '</p>');
+
+                    d.scrollTop(d.prop("scrollHeight"));
                 },
 
                 onOpen: function(event) {
-                    console.log('@onopen');
+                    //console.log('@onopen');
                 },
 
                 onMessage: function(event) {
-                    console.log('@onmessage');
                     var data = JSON.parse(event.data);
-                    console.log(event);
 
-                    chat.chat(data.message); // @FIX
+                    this.fireEvent(data.event, data);
                 },
     
                 onError: function(event) { 
                     console.log('@onerror');
+                    console.log(event);
                 },
 
                 onClose: function(event) { 
                     console.log('@onclose');
+                },
+
+                fireEvent: function(ev, data) {
+                    this.listeners[ev](data);
+                },
+
+                on: function(ev, fn) {
+                    this.listeners[ev] = fn;
+                },
+
+                login: function(username) {
+                    var d = {
+                        event: 'login',
+                        username: username
+                    }
+
+                    this.send(JSON.stringify(d));
                 }
             });
 
             chat = null;
+
+            function connect() {
+                auth = false;
+                chat = new Client('vsmoraes.dev', 10000);
+
+                chat.on('message', function(data) {
+                    chat.chat(data.message);
+                });
+
+                chat.on('updateUserList', function(data) {
+                    $('ul.userlist').empty();
+
+                    for ( i in data.user_list ) {
+                        $('ul.userlist').append('<li class="list-group-item">' + data.user_list[i] + '</li>');
+                    }
+
+                    auth = true;
+                    $('#authModal').modal('hide');
+                });
+
+                chat.connect();
+
+                $('#authModal').modal({
+                    backdrop: 'static',
+                    keyboard: false,
+                    show: true
+                });
+            }
+
             $(function() {
                 $('#send-message').click(function() {
                     var val = $('input[name="message"]').val();
@@ -87,30 +159,59 @@
                     chat.send(JSON.stringify(data));
                 });
 
-                chat = new Client('vsmoraes.dev', 10000);
-                chat.connect();
+                $('#loginButton').click(function() {
+                    var username = $(this).parents('form:first').find('input:first').val();
+                    
+                    chat.login(username);
+                });
+
+                connect();
             });
         </script>
 
-        <style text="text/css">
-            .starter-template {
-                padding: 40px 15px;
-                text-align: center;
-            }
-
-            .chat {
-                height: 300px;
-                text-align: left;
-            }
-        </style>
     </head>
 
     <body>
+
+        <div class="modal fade" id="authModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-sm">
+                <form role="form">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h4 class="modal-title">Enter your username</h4>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <input type="text" class="form-control" name="username" placeholder="Your username here" />
+                            </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" id="loginButton">Login</button>
+                        </div>
+                    </div>
+                </div><!-- /.modal-content -->
+            </div><!-- /.modal-dialog -->
+        </div><!-- /.modal -->
+
         <div class="container">
             <div class="starter-template">
                 <h1>Aegir : PHP Simple Socket Chat</h1>
-                
-                <div class="well chat" id="chatlog"></div>
+
+                <div class="row">                
+                    <div class="well col-xs-10 chat" id="chatlog"></div>
+
+                    <div class="col-xs-2">
+                        <div class="panel panel-default">
+                            <div class="panel-heading">Online users</div>
+
+                            <ul class="list-group userlist">
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="clearfix"></div>
 
                 <div class="input-group">
                     <input type="text" name="message" placeholder="Your message here" class="form-control">

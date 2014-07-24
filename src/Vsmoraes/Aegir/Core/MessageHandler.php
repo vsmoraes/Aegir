@@ -7,7 +7,7 @@ abstract class MessageHandler {
     {
         $b1 = 0x80 | (0x1 & 0x0f);
         $length = strlen($text);
-
+        
         if($length <= 125)
             $header = pack('CC', $b1, $length);
         elseif($length > 125 && $length < 65536)
